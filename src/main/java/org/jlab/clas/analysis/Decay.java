@@ -260,8 +260,4 @@ public class Decay extends Particle {
         this.yB = yB;
     }
     
-    VertexFinder vertexFinder = new VertexFinder();
-
-        
-    
 }

@@ -9,9 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.jlab.clas.pdg.PDGDatabase;
-import org.jlab.clas.swimtools.Swim;
 import org.jlab.io.base.DataBank;
-import org.jlab.rec.vtx.VertexFinder;
 
 /**
  *
@@ -35,8 +33,7 @@ public class Decay extends Particle {
     private boolean useSwimmer = true;
     
     public Decay(int parPID, int dau1PID, int dau2PID, int dau3PID, double loMassCut, double hiMassCut,
-            List<Particle> daughters, double xb, double yb, Swim swimmer) {
-        this.setSwimmer(swimmer);
+            List<Particle> daughters) {
         _parPID = parPID;
         _dau1PID = dau1PID;
         _dau2PID = dau2PID;
@@ -45,8 +42,6 @@ public class Decay extends Particle {
         _hiMassCut = hiMassCut;
         _daughters = daughters;
         
-        this.setxB(xb);
-        this.setyB(yb);
         //System.out.println("PIDS "+dau1PID+", "+dau2PID);
         this.sortByPID(daughters, dau1PID, dau2PID, dau3PID);
         List<Particle> list1 = new ArrayList<>();
@@ -70,6 +65,20 @@ public class Decay extends Particle {
                                     if(this.checkVertex(part1,part2)==false)
                                         continue;
                             }
+                            if(part1.getCharge()!=0 && part2.getCharge()!=0) {
+                                part1.setVx(vx1);
+                                part1.setVy(vy1);
+                                part1.setVz(vz1);
+                                part1.setPx(px1);
+                                part1.setPy(py1);
+                                part1.setPz(pz1);
+                                part2.setVx(vx2);
+                                part2.setVy(vy2);
+                                part2.setVz(vz2);
+                                part2.setPx(px2);
+                                part2.setPy(py2);
+                                part2.setPz(pz2);
+                            }
                             if(part.combine(part1, part2, parPID, loMassCut, hiMassCut)) { 
                                 
                                 if(part1.getCharge()!=0 && part2.getCharge()==0) {
@@ -91,6 +100,7 @@ public class Decay extends Particle {
                                 part.setVy(vy);
                                 part.setVz(vz);
                                 part.setR(r);
+                                
                                 _particles.add(part);
                             }
                         }
@@ -182,82 +192,107 @@ public class Decay extends Particle {
     public static void setVertBank(DataBank vertBank) {
         Decay.vertBank = vertBank;
     }
-    private Swim swimmer;
-    private double xB;
-    private double yB;
     
     private double r = 999;
     private double vx =999;
     private double vy =999;
     private double vz =999;
+    private double vx1 =999;
+    private double vy1 =999;
+    private double vz1 =999;
+    private double px1 =999;
+    private double py1 =999;
+    private double pz1 =999;
+    private double vx2 =999;
+    private double vy2 =999;
+    private double vz2 =999;
+    private double px2 =999;
+    private double py2 =999;
+    private double pz2 =999;
     
+    private void reset() {
+        r = 999;
+        vx =999;
+        vy =999;
+        vz =999;
+        vx1 =999;
+        vy1 =999;
+        vz1 =999;
+        px1 =999;
+        py1 =999;
+        pz1 =999;
+        vx2 =999;
+        vy2 =999;
+        vz2 =999;
+        px2 =999;
+        py2 =999;
+        pz2 =999;
+    }
     private boolean checkVertex(Particle p1, Particle p2) {
+        if(getVertBank()==null) return false;
         if(getVertBank()!=null) {
             int nrows2 = getVertBank().rows();
             for(int loop2 = 0; loop2 < nrows2; loop2++){
-                int index1 = (int) getVertBank().getShort("index1", loop2);
-                int index2 = (int) getVertBank().getShort("index2", loop2);
-
-                if(p1.getIdx()-1==index1 || p1.getIdx()-1==index2)
-                    p1.vIndex=loop2;
-                if(p2.getIdx()-1==index1 || p2.getIdx()-1==index2)
-                    p2.vIndex=loop2;
-                if(p1.vIndex==p2.vIndex) 
-                    loop2 = nrows2;
+                reset();
+                int index1 = -1;//(int) getVertBank().getShort("index1", loop2);
+                int index2 = -1;//(int) getVertBank().getShort("index2", loop2);
+                if(p1.getIdx()-1==(int) getVertBank().getShort("index1", loop2)) {
+                    index1 = (int) getVertBank().getShort("index1", loop2);
+                    if(p2.getIdx()-1==(int) getVertBank().getShort("index2", loop2)) {
+                        index2 = (int) getVertBank().getShort("index2", loop2);
+                    }
+                    if(index1!=-1 && index2!=-1) {
+                        p1.vIndex=loop2;
+                        p2.vIndex=loop2;
+                        r =  (double) getVertBank().getFloat("r", loop2);
+                        vx = (double) getVertBank().getFloat("x", loop2);
+                        vy = (double) getVertBank().getFloat("y", loop2);
+                        vz = (double) getVertBank().getFloat("z", loop2);
+                        vx1 = (double) getVertBank().getFloat("x1", loop2);
+                        vy1 = (double) getVertBank().getFloat("y1", loop2);
+                        vz1 = (double) getVertBank().getFloat("z1", loop2);
+                        px1 = (double) getVertBank().getFloat("cx1", loop2);
+                        py1 = (double) getVertBank().getFloat("cy1", loop2);
+                        pz1 = (double) getVertBank().getFloat("cz1", loop2);
+                        vx2 = (double) getVertBank().getFloat("x2", loop2);
+                        vy2 = (double) getVertBank().getFloat("y2", loop2);
+                        vz2 = (double) getVertBank().getFloat("z2", loop2);
+                        px2 = (double) getVertBank().getFloat("cx2", loop2);
+                        py2 = (double) getVertBank().getFloat("cy2", loop2);
+                        pz2 = (double) getVertBank().getFloat("cz2", loop2);
+                    }
+                } 
+                if(p1.getIdx()-1==(int) getVertBank().getShort("index2", loop2)) {
+                    index1 = (int) getVertBank().getShort("index2", loop2);
+                    if(p2.getIdx()-1==(int) getVertBank().getShort("index1", loop2)) {
+                        index2 = (int) getVertBank().getShort("index1", loop2);
+                    }
+                    if(index1!=-1 && index2!=-1) {
+                        p1.vIndex=loop2;
+                        p2.vIndex=loop2;
+                        r =  (double) getVertBank().getFloat("r", loop2);
+                        vx = (double) getVertBank().getFloat("x", loop2);
+                        vy = (double) getVertBank().getFloat("y", loop2);
+                        vz = (double) getVertBank().getFloat("z", loop2);
+                        vx1 = (double) getVertBank().getFloat("x2", loop2);
+                        vy1 = (double) getVertBank().getFloat("y2", loop2);
+                        vz1 = (double) getVertBank().getFloat("z2", loop2);
+                        px1 = (double) getVertBank().getFloat("cx2", loop2);
+                        py1 = (double) getVertBank().getFloat("cy2", loop2);
+                        pz1 = (double) getVertBank().getFloat("cz2", loop2);
+                        vx2 = (double) getVertBank().getFloat("x1", loop2);
+                        vy2 = (double) getVertBank().getFloat("y1", loop2);
+                        vz2 = (double) getVertBank().getFloat("z1", loop2);
+                        px2 = (double) getVertBank().getFloat("cx1", loop2);
+                        py2 = (double) getVertBank().getFloat("cy1", loop2);
+                        pz2 = (double) getVertBank().getFloat("cz1", loop2);
+                    }
+                }
             }
-            if(p1.vIndex==-1 || p2.vIndex==-1 || p1.vIndex!=p2.vIndex) 
-                return false;
-            r =  (double) getVertBank().getFloat("r", p1.vIndex);
-            vx = (double) getVertBank().getFloat("x", p1.vIndex);
-            vy = (double) getVertBank().getFloat("y", p1.vIndex);
-            vz = (double) getVertBank().getFloat("z", p1.vIndex);
-            
-            return true;
-        } else {
-            return false;
+            if(r!=999) {
+                return true;
+            } 
         }
+        return false;
     }
-
-    /**
-     * @return the swimmer
-     */
-    public Swim getSwimmer() {
-        return swimmer;
-    }
-
-    /**
-     * @param swimmer the swimmer to set
-     */
-    public void setSwimmer(Swim swimmer) {
-        this.swimmer = swimmer;
-    }
-
-    /**
-     * @return the xB
-     */
-    public double getxB() {
-        return xB;
-    }
-
-    /**
-     * @param xB the xB to set
-     */
-    public void setxB(double xB) {
-        this.xB = xB;
-    }
-
-    /**
-     * @return the yB
-     */
-    public double getyB() {
-        return yB;
-    }
-
-    /**
-     * @param yB the yB to set
-     */
-    public void setyB(double yB) {
-        this.yB = yB;
-    }
-    
 }

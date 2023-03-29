@@ -84,10 +84,6 @@ public class Analysis extends ReconstructionEngine {
         //System.out.println("EVENT "+event.getBank("RUN::config").getInt("event", 0));
         this.Run = this.getRun();
         
-        Swim swimmer = new Swim();
-        IndexedTable beamPos   = this.getConstantsManager().getConstants(this.getRun(), "/geometry/beam/position");
-        double xB = beamPos.getDoubleValue("x_offset", 0, 0, 0);
-        double yB = beamPos.getDoubleValue("y_offset", 0, 0, 0);
         // Load target
         if(!LOADED) {
             ConstantProvider providerTG = GeometryFactory.getConstants(DetectorType.TARGET, this.getRun(), this.getConstantsManager().getVariation());
@@ -123,9 +119,7 @@ public class Analysis extends ReconstructionEngine {
                     Constants.getInstance().dau3.get(k), 
                     Constants.getInstance().lowBound.get(k), 
                     Constants.getInstance().highBound.get(k), 
-                    allparts, 
-                    xB, yB,
-                    swimmer);
+                    allparts);
             if(dec!=null) {
                 if(dec.getParticles()!=null) {
                     parts.addAll(dec.getParticles());

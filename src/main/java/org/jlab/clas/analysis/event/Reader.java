@@ -28,7 +28,7 @@ public class Reader {
     public void readDataBanks(DataEvent event, double zTar) {
         getParts().clear();
         getDaus().clear();
-        
+        iseDetected = false;
         DataBank runConf = null; 
         DataBank recBankEB = null;
         DataBank recDeteEB = null; 
@@ -65,6 +65,8 @@ public class Reader {
             }
         }
         if(recBankEB!=null) {
+            if(recBankEB.getInt("pid", 0)==11)
+                    this.iseDetected = true;
             int nrows = recBankEB.rows();
             for(int loop = 0; loop < nrows; loop++){
                 double px = recBankEB.getFloat("px", loop);
@@ -157,8 +159,7 @@ public class Reader {
                         }
                     }
                 }
-                if(recBankEB.getInt("pid", loop)==11)
-                    this.iseDetected = true;
+                
                 if(Math.abs(pidCode)==211 || Math.abs(pidCode)==321  || Math.abs(pidCode)==2212 || pidCode==11) {
                     
                     double beta = (double)recBankEB.getFloat("beta", loop);

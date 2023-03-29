@@ -3,18 +3,15 @@ package org.jlab.clas.analysis;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.jlab.clas.analysis.event.EventProcessor;
 import org.jlab.clas.analysis.event.Reader;
 import org.jlab.clas.analysis.event.Writer;
 import org.jlab.clas.reco.ReconstructionEngine;
-import org.jlab.clas.swimtools.Swim;
 import org.jlab.detector.base.DetectorType;
 import org.jlab.detector.base.GeometryFactory;
 import org.jlab.geom.base.ConstantProvider;
 import org.jlab.io.base.DataBank;
 import org.jlab.io.base.DataEvent;
 import org.jlab.rec.service.vtx.VTXEngine;
-import org.jlab.utils.groups.IndexedTable;
 
 /**
  * Service to return reconstructed vertices from EB tracks
@@ -62,7 +59,6 @@ public class Analysis extends ReconstructionEngine {
     private double zLength;
     @Override
     public boolean processDataEvent(DataEvent event) {
-        EventProcessor ep;
         Reader reader ;
         Writer writer ;
         if(!event.hasBank("REC::VertDoca")) {
@@ -75,7 +71,6 @@ public class Analysis extends ReconstructionEngine {
             System.err.println("RUN CONDITIONS NOT READ!");
             return false;
         }
-        ep = new EventProcessor();
         reader = new Reader();
         writer = new Writer();
         
@@ -102,12 +97,11 @@ public class Analysis extends ReconstructionEngine {
         int ev  = recRun.getInt("event",0);
         int run = recRun.getInt("run",0);
         
-        ep.readEvent(event);
-        
         reader.readDataBanks(event, 0);
+        //System.out.println("e detected "+reader.iseDetected);
         //DataBank runBank = ep.FillHeader(recRun);
-        //if(!reader.iseDetected)
-        //    return false;
+        if(!reader.iseDetected)
+            return false;
         List<Particle> allparts = new ArrayList<>();
         
         reader.getDaus().forEach((key,value) -> allparts.add(value));

@@ -34,7 +34,8 @@
             {"name":"ndau",     "type":"B", "info":"number of daughters"},
             {"name":"dau1idx",  "type":"S", "info":"daughter 1 idx"},
             {"name":"dau2idx",  "type":"S", "info":"daughter 2 idx"},
-            {"name":"dau3idx",  "type":"S", "info":"daughter 3 idx"}
+            {"name":"dau3idx",  "type":"S", "info":"daughter 3 idx"},
+            {"name":"det",      "type":"B", "info":"det=0 for central, det=1 for forward tracker"}
         ]
     }
 ]

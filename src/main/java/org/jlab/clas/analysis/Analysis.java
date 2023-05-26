@@ -1,18 +1,13 @@
 package org.jlab.clas.analysis;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.jlab.clas.analysis.event.Reader;
 import org.jlab.clas.analysis.event.Writer;
 import org.jlab.clas.reco.ReconstructionEngine;
-import org.jlab.detector.base.DetectorType;
-import org.jlab.detector.base.GeometryFactory;
-import org.jlab.geom.base.ConstantProvider;
+import org.jlab.clas.swimtools.Swim;
 import org.jlab.io.base.DataBank;
 import org.jlab.io.base.DataEvent;
-import org.jlab.rec.service.vtx.VTXEngine;
-
 /**
  * Service to return reconstructed vertices from EB tracks
  *
@@ -23,14 +18,46 @@ import org.jlab.rec.service.vtx.VTXEngine;
 
 public class Analysis extends ReconstructionEngine {
 
-    public Analysis() {
-        super("MYANAL", "ziegler", "1.0");
+    public Analysis(String name) {
+        super(name, "ziegler", "1.0");
     }
     
     String FieldsConfig = "";
     private int Run = -1;
   
- 
+    //e.g. 3122:2212:-211:0:1.0:1.5;-3122:-2212:211:0:1.0:1.5
+    private List<Integer> parent;
+    private List<Integer> dau1;
+    private List<Integer> dau2;
+    private List<Integer> dau3;
+    private List<Double> lowBound;
+    private List<Double> highBound;
+    
+    public void setDecays(String decays) {
+        parent      = new ArrayList<>();
+        dau1        = new ArrayList<>();
+        dau2        = new ArrayList<>();
+        dau3        = new ArrayList<>();
+        lowBound    = new ArrayList<>();
+        highBound   = new ArrayList<>();
+        
+        if(decays!=null) {
+            String[] chain = decays.split(";");
+            for(int i =0; i< chain.length; i++) {
+                String[] decprod = chain[i].split(":");
+                System.out.println(decprod[0]+" --> "+decprod[1]+" + "+decprod[2]);
+                parent.add(Integer.parseInt(decprod[0]));
+                dau1.add(Integer.parseInt(decprod[1]));
+                dau2.add(Integer.parseInt(decprod[2]));
+                dau3.add(Integer.parseInt(decprod[3]));
+                lowBound.add(Double.parseDouble(decprod[4]));
+                highBound.add(Double.parseDouble(decprod[5]));
+                
+            }
+        } else {
+            System.out.println("!!!!!!!!!!!!!DECAYS ARE NULL!!!!!!!!!!!!!!!!!!!");
+        }
+    }
 
     public int getRun() {
         return Run;
@@ -49,23 +76,12 @@ public class Analysis extends ReconstructionEngine {
     }
     
     public static double beamE = 10.6;
-    
-    public static boolean useVtxBank = false;
-    
-    
-    boolean LOADED = false;
-    
-    private double zTarget;
-    private double zLength;
+    private int pass =1;
     @Override
     public boolean processDataEvent(DataEvent event) {
         Reader reader ;
         Writer writer ;
-        if(!event.hasBank("REC::VertDoca")) {
-            VTXEngine vtxe = new VTXEngine();
-            vtxe.init();
-            vtxe.processDataEvent(event);
-        }
+        
         this.FieldsConfig = this.getFieldsConfig();
         if (event.hasBank("RUN::config") == false) {
             System.err.println("RUN CONDITIONS NOT READ!");
@@ -79,69 +95,74 @@ public class Analysis extends ReconstructionEngine {
         //System.out.println("EVENT "+event.getBank("RUN::config").getInt("event", 0));
         this.Run = this.getRun();
         
-        // Load target
-        if(!LOADED) {
-            ConstantProvider providerTG = GeometryFactory.getConstants(DetectorType.TARGET, this.getRun(), this.getConstantsManager().getVariation());
-            this.zTarget = providerTG.getDouble("/geometry/target/position",0);
-            this.zLength = providerTG.getDouble("/geometry/target/length",0);
-            //System.out.println("TARGET   "+this.zTarget);
-            LOADED = true;
-        }
+        
         DataBank recRun    = null;
         DataBank recBankEB = null;
         DataBank recEvenEB = null;
+        DataBank recParts = null;
         if(event.hasBank("RUN::config"))            recRun      = event.getBank("RUN::config");
         if(event.hasBank("REC::Particle"))          recBankEB   = event.getBank("REC::Particle");
         if(event.hasBank("REC::Event"))             recEvenEB   = event.getBank("REC::Event");
+        if(event.hasBank("ANAL::Particle"))         recParts   = event.getBank("ANAL::Particle");
         if(recRun == null) return true;
+        if(recParts == null) {
+            return true;
+        } 
         int ev  = recRun.getInt("event",0);
         int run = recRun.getInt("run",0);
-        
-        reader.readDataBanks(event, 0);
+        Swim swim = new Swim();
+        //reader.readAnalBanks(event);
+        reader.readBanks(event);
+        //List<Particle> parts1 = reader.getPartsFromRec(event);
+        //reader.updateDausList(parts1);
         //System.out.println("e detected "+reader.iseDetected);
         //DataBank runBank = ep.FillHeader(recRun);
-        if(!reader.iseDetected)
-            return false;
+        //if(!reader.iseDetected)
+        //    return false;
         List<Particle> allparts = new ArrayList<>();
         
         reader.getDaus().forEach((key,value) -> allparts.add(value));
+        //System.out.println("CHECK DAUS "+allparts.size());
         List<Particle> parts = new ArrayList<>();
-        for(int k = 0; k < Constants.getInstance().parent.size(); k++) {
-            Decay dec = new Decay(Constants.getInstance().parent.get(k), 
-                    Constants.getInstance().dau1.get(k), 
-                    Constants.getInstance().dau2.get(k), 
-                    Constants.getInstance().dau3.get(k), 
-                    Constants.getInstance().lowBound.get(k), 
-                    Constants.getInstance().highBound.get(k), 
-                    allparts);
+        for(int k = 0; k < this.parent.size(); k++) {
+            Decay dec = new Decay(this.parent.get(k), 
+                    this.dau1.get(k), 
+                    this.dau2.get(k), 
+                    this.dau3.get(k), 
+                    this.lowBound.get(k), 
+                    this.highBound.get(k), 
+                    allparts, swim,pass);
             if(dec!=null) {
                 if(dec.getParticles()!=null) {
-                    parts.addAll(dec.getParticles());
+                    parts.addAll(dec.getParticles()); 
                 }
             }
         } 
         
-        List<DataBank> banks = new ArrayList<>();
-        banks.add(writer.fillBank(event, parts, ""));
-
-        event.appendBanks(banks.toArray(new DataBank[0]));
-        
+        DataBank bank = Writer.fillBank(event, parts, "ANAL::Particle", pass);
+        if(bank!=null) {
+            event.appendBanks(bank);
+            bank.show();
+            //System.out.println("================================================");
+            //System.out.println(event.getBank("ANALREC::Particle").getInt("event", 0));
+            //System.out.println("================================================");
+            //event.appendBank(bank);
+        }
+        //event.show();
         return true;
    }
 
     @Override
     public boolean init() {
-        
-        this.initConstantsTables();
+       
         this.registerBanks();
         this.loadConfiguration();
         this.printConfiguration();
         return true;
     }
     private void registerBanks() {
-        super.registerOutputBank("ANAL::Event");
-        super.registerOutputBank("ANAL::Particle");
-        super.registerOutputBank("ANAL::Daughter");
+        
+        super.registerOutputBank("ANALREC::Particle");
     } 
     
     public static void main(String[] args) {
@@ -151,30 +172,21 @@ public class Analysis extends ReconstructionEngine {
     public void loadConfiguration() {            
         
         // general (pass-independent) settings
-        
-        if (this.getEngineConfigString("decays")!=null) 
-            Constants.getInstance().setDecays(this.getEngineConfigString("decays"));
-        
-        
+        String dec = "decays";
+        if (this.getEngineConfigString(dec)!=null) 
+            this.setDecays(this.getEngineConfigString(dec));
+        if (this.getEngineConfigString("pass")!=null) {
+            pass=Integer.parseInt(this.getEngineConfigString("pass"));
+        }
+        Constants.Load();
     }
-
-
-    public void initConstantsTables() {
-        String[] tables = new String[]{
-            "/geometry/beam/position",
-            "/geometry/target"
-        };
-        requireConstants(Arrays.asList(tables));
-        this.getConstantsManager().setVariation("default");
-    }
-    
     
     
     
     public void printConfiguration() {            
-        for(int i =0; i<Constants.getInstance().parent.size(); i++) {
+        for(int i =0; i<this.parent.size(); i++) {
             System.out.println("["+this.getName()+"] Reconstructing "+
-                    Constants.getInstance().parent.get(i)+"-->"+Constants.getInstance().dau1.get(i)+":"+Constants.getInstance().dau2.get(i));   
+                    this.parent.get(i)+"-->"+this.dau1.get(i)+":"+this.dau2.get(i));   
         }
         
     }

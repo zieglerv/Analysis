@@ -7,17 +7,57 @@ package org.jlab.clas.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.jlab.clas.pdg.PDGDatabase;
 import org.jlab.clas.physics.LorentzVector;
 import org.jlab.clas.physics.Vector3;
 import org.jlab.clas.reactions.DecayKinematics;
-
+import org.jlab.clas.swimtools.Swim;
+import cnuphys.swim.SwimTrajectory;
+import org.jlab.geom.prim.Point3D;
 /**
  *
  * @author ziegler
  */
 public class Particle {
 
+    Particle(Particle part1) {
+        this._E=part1._E;
+        this._Idx = part1._Idx;
+        this._beta = part1._beta;
+        this._calcBeta = part1._calcBeta;
+        this._charge=part1._charge;
+        this._det = part1._det;
+        this._daughters = part1._daughters;
+        this._mass = part1._mass;
+        this._massConstrE = part1._massConstrE;
+        this._mass = part1._mass;
+        this._umass = part1._umass;
+        this._uncormass = part1._uncormass;
+        this._p = part1._p;
+        this._pid = part1._pid;
+        this._pt = part1._pt;
+        this._px = part1._px;
+        this._pxcm = part1._pxcm;
+        this._py = part1._py;
+        this._pycm = part1._pycm;
+        this._pz = part1._pz;
+        this._pzcm = part1._pzcm;
+        this._r = part1._r;
+        this._recmass = part1._recmass;
+        this._status = part1._status;
+        this._uE = part1._uE;
+        this._upx = part1._upx;
+        this._uvx = part1._uvx;
+        this._upy = part1._upy;
+        this._uvy = part1._uvy;
+        this._upz = part1._upz;
+        this._uvz = part1._uvz;
+        this._px = part1._px;
+        this._vx = part1._vx;
+        this._py = part1._py;
+        this._vy = part1._vy;
+        this._pz = part1._pz;
+        this._vz = part1._vz;
+    }
     /**
      * @return the recParticle
      */
@@ -49,7 +89,7 @@ public class Particle {
     private double _r; // distance of closest approach between 2 track helices
     private double _p;
     private double _pt;
-    
+    private double _uncormass;
     private double _umass ;
     private double _uE;
     private double _upx;
@@ -67,7 +107,9 @@ public class Particle {
     private int _pid;
     public int vIndex=-1; 
     
-    private List<Particle> _daughters;
+    private int _det = -1;
+    
+    private List<Particle> _daughters = new ArrayList<Particle>();
     private org.jlab.clas.physics.Particle recParticle ;
     
     public Particle() {
@@ -77,24 +119,23 @@ public class Particle {
     public void setParticle(org.jlab.clas.physics.Particle recPart) {
         _daughters = new ArrayList<Particle>();
         recParticle = recPart; 
-        if(recParticle.pid()!=0 && org.jlab.clas.pdg.PDGDatabase.getParticleById(Math.abs(recParticle.pid()))!=null){
-            if(recParticle.pid()<0) {
-                this.setMass(PDGDatabase.getParticleById(-recParticle.pid()).mass());
-            } else {
-                this.setMass(PDGDatabase.getParticleById(recParticle.pid()).mass());
-            }
-        }
+        
         this.setBeta(recParticle.getProperty("beta"));
         this.setCalcBeta(recParticle.getProperty("calcbeta"));
         this.setCharge(recParticle.charge());
-        double massConstE = Math.sqrt(recParticle.p()*recParticle.p()
-               +this.getMass()*this.getMass());
-        
-        this.setMassConstrE(massConstE);
         this.setRecMass(recParticle.getProperty("mass"));
         double E = Math.sqrt(recParticle.p()*recParticle.p()
                +this.getRecMass()*this.getRecMass());
         this.setE(E);
+        
+        if(recParticle.pid()!=0 && Constants.particleMap.containsKey(recParticle.pid())){
+            this.setMass(Constants.particleMap.get(recParticle.pid()).mass());
+        } else {
+            this.setMass(this.getMass());
+        }
+        double massConstE = Math.sqrt(recParticle.p()*recParticle.p()
+               +this.getMass()*this.getMass());
+        this.setMassConstrE(massConstE);
         this.setVx(recParticle.vx());
         this.setVy(recParticle.vy());
         this.setVz(recParticle.vz());
@@ -231,12 +272,25 @@ public class Particle {
         this._uvz = _uvz;
     }
 
+    /**
+     * @return the _det
+     */
+    public int getDet() {
+        return _det;
+    }
+
+    /**
+     * @param _det the _det to set
+     */
+    public void setDet(int _det) {
+        this._det = _det;
+    }
+
     public Particle(int idx, int pid, double e, double px, double py, double pz, 
             double ecm, double pxcm, double pycm, double pzcm,
             double vx, double vy, double vz, 
             int charge,double mass,
             int ndau, int dau1idx, int dau2idx, int dau3idx) {
-        _daughters = new ArrayList<Particle>();
         this._Idx = idx;
         this._pid = pid;
         this._massConstrE = e;
@@ -274,23 +328,29 @@ public class Particle {
     }
     
     public boolean combine(Particle part1, Particle part2, int pid, double mLo, double mHi) {
-        
+        //System.out.println("combining"); System.out.println(part1.toString()); System.out.println(part2.toString());
         double Vx = 0.5*(part1.getVx()+part2.getVx());
         double Vy = 0.5*(part1.getVy()+part2.getVy());
         double Vz = 0.5*(part1.getVz()+part2.getVz());
         
+        double dx = part1.getVx()-part2.getVx();
+        double dy = part1.getVy()-part2.getVy();
+        double dz = part1.getVz()-part2.getVz();
+        
+        double r = Math.sqrt(dx*dx+dy*dy+dz*dz);
+        
         double Px = part1.getPx()+part2.getPx();
         double Py = part1.getPy()+part2.getPy();
         double Pz = part1.getPz()+part2.getPz();
-        
+                
         double mass = this.calcMass(part1, part2);
         double umass = this.calcUMass(part1, part2);
 
-        if(mass < mLo || mass > mHi) 
-            return false;
+        //if(mass < mLo || mass > mHi) 
+        //    return false;
         
         org.jlab.clas.physics.Particle recParticle = new org.jlab.clas.physics.Particle(
-                                                pid,
+                                                22,
                                                 Px,
                                                 Py,
                                                 Pz,
@@ -315,11 +375,24 @@ public class Particle {
         this.setParticle(recParticle);
         this.setPid(pid);
         this.setCharge(part1.getCharge()+part2.getCharge());
+        this.setE(part1.getE()+part2.getE());
+        this.setMassConstrE(part1.getMassConstrE()+getMassConstrE());
         this.setUmass(umass);
+        
+        this.setR(r);
+        this.setVx(Vx);
+        this.setVy(Vy);
+        this.setVz(Vz);
+        this.setPx(Px);
+        this.setPy(Py);
+        this.setPz(Pz);
         this._daughters.add(part1);
         this._daughters.add(part2);
+        //System.out.println("check"); System.out.println(part1.toString()); System.out.println(part2.toString());
+        
         return true;
     }
+    
     public void boost2CMFrm(org.jlab.clas.physics.Particle B, LorentzVector Bb) {
         Vector3 boost = Bb.boostVector();
         Vector3 boostm = new Vector3(-boost.x(), -boost.y(), -boost.z());
@@ -380,6 +453,20 @@ public class Particle {
      */
     public void setMass(double _mass) {
         this._mass = _mass;
+    }
+
+    /**
+     * @return the _uncormass
+     */
+    public double getUncormass() {
+        return _uncormass;
+    }
+
+    /**
+     * @param _uncormass the _uncormass to set
+     */
+    public void setUncormass(double _uncormass) {
+        this._uncormass = _uncormass;
     }
     
     /**
@@ -716,5 +803,72 @@ public class Particle {
         return Math.sqrt(E*E - Px*Px-Py*Py-Pz*Pz);
         
     }
-
+    private Swim swim;
+      
+    double[] SwimTo(int q, double vx, double vy, double vz, double px, double py, double pz, Swim swim) {
+        
+        double[] result = new double[6];
+        if(vz>this.getVz()) {
+            swim.SetSwimParameters(this.getVx(), this.getVy(), this.getVz(), 
+                this.getPx(), this.getPy(), this.getPz(), this.getCharge());
+        } else {
+            swim.SetSwimParameters(this.getVx(), this.getVy(), this.getVz(), 
+                -this.getPx(), -this.getPy(), -this.getPz(), -this.getCharge());
+        }
+        double p = Math.sqrt(px*px+py*py+pz*pz);
+        double theta = Math.toDegrees(Math.acos(pz/p));
+        double phi = Math.toDegrees(Math.atan2(py, px));
+        
+        double step = 0.025; //cm
+        double vxt = vx/100.0; //swimTrajctory arg in m
+        double vyt = vy/100.0;
+        double vzt = vz/100.0;
+        
+        
+        int nstep = (int)(Math.sqrt((vx-this.getVx())*(vx-this.getVx())+
+                (vy-this.getVy())*(vy-this.getVy())+(vz-this.getVz())*(vz-this.getVz()))/step)+2;
+        
+        SwimTrajectory tr = new SwimTrajectory(q,vxt-nstep*px/p*step/100.0,vyt-nstep*py/p*step/100.0,vzt-nstep*pz/p*step/100.0,p,theta,phi,nstep+2);
+        for(int i =nstep-1; i>-1; i--) {
+            tr.add(vxt-i*px/p*step/100.0,vyt-i*py/p*step/100.0,vzt-i*pz/p*step/100.0, theta, theta, phi);           
+        }
+        double[] pars = swim.SwimToDCA(tr);
+        result[0] = pars[0];
+        result[1] = pars[1];
+        result[2] = pars[2];
+        result[3] = pars[3];
+        result[4] = pars[4];
+        result[5] = pars[5];
+        
+        return result;
+    }
+    public boolean hasDaughters() {
+        boolean d = false;
+        if(this.getDaughters()!=null && !this.getDaughters().isEmpty())
+            d = true;
+        return d;
+    }
+    
+    @Override
+    public String toString() {
+        String s="";
+        s+=this.getIdx()+" pid "+this.getPid()+" X "+new Point3D(this.getVx(), this.getVy(), this.getVz()).toString()
+                +" P "+new Point3D(this.getPx(), this.getPy(), this.getPz()).toString()+" mass "+this.getMass()+" ndau "+this.getDaughters().size();
+        if(this.hasDaughters()) {
+            for(Particle p : this.getDaughters()) {
+                if(p!=null) {
+                    s+="daughter "+p.getIdx()+" pid "+p.getPid()+" X "+new Point3D(p.getVx(), p.getVy(), p.getVz()).toString()
+                        +" P "+new Point3D(p.getPx(), p.getPy(), p.getPz()).toString()+" mass "+p.getMass();
+                    if(p.hasDaughters()) {
+                        for(int i = 0; i<p.getDaughters().size(); i++) {
+                            Particle p2 = p.getDaughters().get(i);
+                            s+="granddaughter "+p2.getIdx()+" pid "+p2.getPid()+" X "+new Point3D(p2.getVx(), p2.getVy(), p2.getVz()).toString()
+                            +" P "+new Point3D(p2.getPx(), p2.getPy(), p2.getPz()).toString()+" mass "+p2.getMass();
+                        }
+                    }
+                }
+            }
+        } 
+        return s;
+    }
 }

@@ -3,6 +3,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package org.jlab.clas.analysis.event;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -23,11 +24,20 @@ public class Reader {
     private Map<Integer, Particle> daus = new HashMap<>();
     public static boolean useMCTruth = true;
     public boolean iseDetected = false;
-    private boolean updateWithUTrack = true;
+    private final boolean updateWithUTrack = true;
    
-    public void readDataBanks(DataEvent event, double zTar) {
+    public void readDataBanksold(DataEvent event) {
         getParts().clear();
         getDaus().clear();
+        List<Particle> parts = this.getPartsFromRec(event);
+        if(parts!=null) {
+            for(Particle part : parts) {
+                getDaus().put(part.getIdx(), part);
+            }
+        }
+    }
+    
+    public List<Particle> getPartsFromRec(DataEvent event) {
         iseDetected = false;
         DataBank runConf = null; 
         DataBank recBankEB = null;
@@ -35,7 +45,7 @@ public class Reader {
         DataBank vertBankEB = null;
         DataBank trkBankEB = null;
         DataBank utrkBankEB = null;
-        
+        List<Particle> parts = new ArrayList<>();
         int ev = 0;
         if(event.hasBank("REC::Particle")) recBankEB = event.getBank("REC::Particle");
         if(event.hasBank("REC::Track")) trkBankEB = event.getBank("REC::Track");
@@ -103,6 +113,12 @@ public class Reader {
                 double vx = recBankEB.getFloat("vx", loop);
                 double vy = recBankEB.getFloat("vy", loop);
                 double vz = recBankEB.getFloat("vz", loop);
+                int det = -1;
+                
+                if((int) (Math.abs(recBankEB.getInt("status", loop))/1000)==4) 
+                    det = 0;
+                if((int) (Math.abs(recBankEB.getInt("status", loop))/1000)==2) 
+                    det = 1;
                 if(this.updateWithUTrack) {
                     double[] t = pTrkMap.get(loop);
                     px = t[0];
@@ -147,15 +163,17 @@ public class Reader {
                         if(energy1>0.05 && energy4>0.0) {
                             double energy=(energy1+energy4+energy7)/0.245;
                             recParticle.setProperty("energy", energy);
-                            getDaus().put(loop+1, new Particle(recParticle)); 
-                            getDaus().get(loop+1).setIdx(loop+1);
-                            getDaus().get(loop+1).setPid(pidCode);
-                            getDaus().get(loop+1).setUvx(vx);
-                            getDaus().get(loop+1).setUvy(vy);
-                            getDaus().get(loop+1).setUvz(vz);
-                            getDaus().get(loop+1).setUpx(px);
-                            getDaus().get(loop+1).setUpy(py);
-                            getDaus().get(loop+1).setUpz(pz);
+                            Particle part = new Particle(recParticle);
+                            part.setIdx(loop+1);
+                            part.setPid(pidCode);
+                            part.setUvx(vx);
+                            part.setUvy(vy);
+                            part.setUvz(vz);
+                            part.setUpx(px);
+                            part.setUpy(py);
+                            part.setUpz(pz);
+                            part.setDet(det);
+                            parts.add(part);
                         }
                     }
                 }
@@ -168,7 +186,7 @@ public class Reader {
                     double calcBeta = recParticle.p()/Math.sqrt(recParticle.p()*recParticle.p()
                             +recParticle.mass()*recParticle.mass());
                     double mass2   = Math.pow(recParticle.p()/beta, 2)-recParticle.p()*recParticle.p();
-                   
+                    if(mass2<0) continue;
                     int status = (int) Math.abs(recBankEB.getShort("status", loop));
                     double chi2pid = (double) Math.abs(recBankEB.getFloat("chi2pid", loop));
                     recParticle.setProperty("status", (double) status);
@@ -177,41 +195,54 @@ public class Reader {
                     recParticle.setProperty("calcbeta", (double) calcBeta);
                     recParticle.setProperty("mass", recParticle.mass()); 
                     
-                    if(chi2pid<10 ) {    
+                    if(chi2pid<Double.POSITIVE_INFINITY ) {    
                         Particle part = new Particle(recParticle);
                         
                         if(pidCode==11 && Math.abs(status)<4000)  { 
-                            getDaus().put(loop+1, new Particle(recParticle)); 
-                            getDaus().get(loop+1).setIdx(loop+1);
-                            getDaus().get(loop+1).setPid(pidCode);
-                            getDaus().get(loop+1).setUmass(Math.sqrt(mass2));
-                            getDaus().get(loop+1).setUvx(vx);
-                            getDaus().get(loop+1).setUvy(vy);
-                            getDaus().get(loop+1).setUvz(vz);
-                            getDaus().get(loop+1).setUpx(px);
-                            getDaus().get(loop+1).setUpy(py);
-                            getDaus().get(loop+1).setUpz(pz);
+                            Particle parte = new Particle(recParticle); 
+                            parte.setIdx(loop+1);
+                            parte.setPid(pidCode);
+                            parte.setUmass(Math.sqrt(mass2)); 
+                            parte.setUvx(vx);
+                            parte.setUvy(vy);
+                            parte.setUvz(vz);
+                            parte.setUpx(px);
+                            parte.setUpy(py);
+                            parte.setUpz(pz);
+                            parte.setDet(det);
+                            parts.add(parte);
                         }
                         if(Math.abs(part.getCharge())==1 && 
                                ( Math.abs(pidCode)==2212 || Math.abs(pidCode)==211 || Math.abs(pidCode)==321 )  ) {
-                            getDaus().put(loop+1, new Particle(recParticle)); 
-                            getDaus().get(loop+1).setIdx(loop+1);
-                            getDaus().get(loop+1).setPid(pidCode);
-                            getDaus().get(loop+1).setUmass(Math.sqrt(mass2));
-                            getDaus().get(loop+1).setUvx(vx);
-                            getDaus().get(loop+1).setUvy(vy);
-                            getDaus().get(loop+1).setUvz(vz);
-                            getDaus().get(loop+1).setUpx(px);
-                            getDaus().get(loop+1).setUpy(py);
-                            getDaus().get(loop+1).setUpz(pz);
-                                
+                            Particle parth = new Particle(recParticle); 
+                            parth.setIdx(loop+1);
+                            parth.setPid(pidCode);
+                            parth.setUmass(Math.sqrt(mass2)); 
+                            parth.setUvx(vx);
+                            parth.setUvy(vy);
+                            parth.setUvz(vz);
+                            parth.setUpx(px);
+                            parth.setUpy(py);
+                            parth.setUpz(pz);
+                            parth.setDet(det);
+                            parts.add(parth); //System.out.println("READ "+pidCode);
                         }
                     }
                 }
             }
         } 
+        return parts;
     }
-    
+    public void readBanks(DataEvent de) {
+        readAnalBanks(de);
+        List<Particle> parts = this.getPartsFromRec(de);
+        if(parts!=null) {
+            for(Particle part : parts) {
+                getDaus().put(part.getIdx(), part);
+            }
+        }
+        getDaus().forEach((key,value)->System.out.println("check "+key+" "+ value.getPid()));
+    }
     public void readAnalBanks(DataEvent de) {
         getParts().clear();
         getDaus().clear();
@@ -219,62 +250,98 @@ public class Reader {
         if(de.hasBank("ANAL::Particle")) partBank = de.getBank("ANAL::Particle");
         if(partBank == null) 
             return;
-       
-        
+        Map<Integer, Particle> partMap = new HashMap<>();
         for(int i=0; i<partBank.rows(); i++) {
             int ev = partBank.getInt("event", i);
-            int idx = partBank.getShort("idx",i);
+            int idx = partBank.getShort("idx",i); System.out.println("read idx "+idx);
             int pid = partBank.getInt("pid",i);
             double e = partBank.getFloat("e",i);
             double px = partBank.getFloat("px",i);
             double py = partBank.getFloat("py",i);
             double pz = partBank.getFloat("pz",i);
-            double ecm = partBank.getFloat("ecm",i);
-            double pxcm = partBank.getFloat("pxcm",i);
-            double pycm = partBank.getFloat("pycm",i);
-            double pzcm = partBank.getFloat("pzcm",i);
             double vx = partBank.getFloat("vx",i);
             double vy = partBank.getFloat("vy",i);
             double vz = partBank.getFloat("vz",i);
             double r = partBank.getFloat("r",i);
             int charge = partBank.getByte("charge",i);
             double mass = partBank.getFloat("mass",i);
+            double umass = partBank.getFloat("umass",i);
             int ndau = partBank.getByte("ndau",i);
             int dau1idx = partBank.getShort("dau1idx",i);
             int dau2idx = partBank.getShort("dau2idx",i);
             int dau3idx = partBank.getShort("dau3idx",i);
             
             Particle part = new Particle( idx,  pid,  e,  px,  py,  pz, 
-             ecm,  pxcm,  pycm,  pzcm,
+             0,  0,  0,  0,
              vx,  vy,  vz, 
              charge, mass,
              ndau,  dau1idx,  dau2idx,  dau3idx);
-            if(ndau==0)
+            int det = (int) partBank.getByte("det",i);
+            part.setIdx(idx);
+            part.setDet(det);
+            part.setUmass(umass);
+            part.setRecMass(mass);
+            part.setR(r);
+            part.setE(e);
+            part.setMassConstrE(e);
+            partMap.put(idx, part);
+            if(ndau==0) {
                 getDaus().put(idx, part);
-            if(ndau>1)
-                getParts().put(idx, part);
+            }
+            if(ndau>1) {
+                getParts().put(idx, part); 
+            }
         }
-        Set entrySet = getParts().entrySet();
-        Iterator it = entrySet.iterator();
-
-        while(it.hasNext()){
-           Map.Entry me = (Map.Entry)it.next();
-           Particle hpart = (Particle) me.getValue();
-           int nd = hpart.getDaughters().size();
-           int d1x = hpart.getDaughters().get(0).getIdx();
-           int d2x = hpart.getDaughters().get(1).getIdx();
-           int d3x = -1;
-           if(nd == 3) 
-               d3x = hpart.getDaughters().get(2).getIdx();
-           hpart.getDaughters().clear();
-           hpart.getDaughters().add(getDaus().get(d1x));
-           hpart.getDaughters().add(getDaus().get(d2x));
-           if(nd == 3) 
-               hpart.getDaughters().add(getDaus().get(d3x));
-           
+        for (Integer i1 : partMap.keySet()) {
+            for (Integer i2 : partMap.keySet()) {
+                if(partMap.get(i1).hasDaughters() ){
+                    for(int j = 0; j<partMap.get(i1).getDaughters().size(); j++) {
+                        if(partMap.get(i1).getDaughters().get(j).getIdx()==partMap.get(i2).getIdx()) {
+                            partMap.get(i1).getDaughters().set(j, partMap.get(i2));
+                        }
+                    }
+                }
+            }
         }
+        for (Integer i1 : partMap.keySet()) {
+            for (Integer i2 : partMap.keySet()) {
+                if(partMap.get(i1).hasDaughters() ){
+                    for(int j = 0; j<partMap.get(i1).getDaughters().size(); j++) {
+                        if(partMap.get(i1).getDaughters().get(j).getIdx()==partMap.get(i2).getIdx()) {
+                            partMap.get(i1).getDaughters().set(j, partMap.get(i2));
+                        }
+                    }
+                }
+            }
+        }
+        getDaus().clear();
+        partMap.forEach((key,value) -> getDaus().put(key, value));
+        getDaus().forEach((key,value)->System.out.println("...daus "+key+" "+ value.toString()));
+ 
+//        while(it.hasNext()){
+//           Map.Entry me = (Map.Entry)it.next();
+//           Particle hpart = (Particle) me.getValue(); System.out.println("READ "+hpart.getPid());
+//           int nd = hpart.getDaughters().size(); System.out.println("READ sz "+nd);
+//           int d1x = hpart.getDaughters().get(0).getIdx();
+//           int d2x = hpart.getDaughters().get(1).getIdx();
+//           int d3x = -1;
+//           if(nd == 3) 
+//               d3x = hpart.getDaughters().get(2).getIdx();
+//           hpart.getDaughters().clear();
+//           hpart.getDaughters().add(getDaus().get(d1x));
+//           hpart.getDaughters().add(getDaus().get(d2x));
+//           if(nd == 3) 
+//               hpart.getDaughters().add(getDaus().get(d3x));
+//           
+//        }
+//        getDaus().clear();
+//        getParts().forEach((key,value)->System.out.println("pars" +key+" "+ value.toString()));
+//        getDaus().forEach((key,value)->System.out.println("...daus "+key+" "+ value.toString()));
+//        getParts().forEach((key,value) -> getDaus().put(key, value));
+//        getDaus().forEach((key,value)->System.out.println("...daus "+key+" "+ value.toString()));
     }
 
+    
     /**
      * @return the parts
      */
@@ -352,6 +419,15 @@ public class Reader {
             }
         }
         return matched;
+    }
+
+    public void updateDausList(List<Particle> parts) {
+        for(Particle part : parts) {
+            if(!getDaus().containsKey(part.getIdx())) {
+                getDaus().put(part.getIdx(), part);
+            }
+        }
+        
     }
 
 }

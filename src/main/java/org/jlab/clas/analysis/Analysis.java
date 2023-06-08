@@ -1,11 +1,14 @@
 package org.jlab.clas.analysis;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.jlab.clas.analysis.event.Reader;
 import org.jlab.clas.analysis.event.Writer;
 import org.jlab.clas.reco.ReconstructionEngine;
 import org.jlab.clas.swimtools.Swim;
+import org.jlab.detector.calib.utils.ConstantsManager;
+import org.jlab.detector.calib.utils.RCDBConstants;
 import org.jlab.io.base.DataBank;
 import org.jlab.io.base.DataEvent;
 /**
@@ -24,7 +27,7 @@ public class Analysis extends ReconstructionEngine {
     
     String FieldsConfig = "";
     private int Run = -1;
-  
+    
     //e.g. 3122:2212:-211:0:1.0:1.5;-3122:-2212:211:0:1.0:1.5
     private List<Integer> parent;
     private List<Integer> dau1;
@@ -32,6 +35,9 @@ public class Analysis extends ReconstructionEngine {
     private List<Integer> dau3;
     private List<Double> lowBound;
     private List<Double> highBound;
+    private List<Integer> noBeamConst= new ArrayList<>();
+    RCDBConstants rcdb = null;
+    ConstantsManager conman = new ConstantsManager();
     
     public void setDecays(String decays) {
         parent      = new ArrayList<>();
@@ -52,13 +58,24 @@ public class Analysis extends ReconstructionEngine {
                 dau3.add(Integer.parseInt(decprod[3]));
                 lowBound.add(Double.parseDouble(decprod[4]));
                 highBound.add(Double.parseDouble(decprod[5]));
-                
             }
         } else {
             System.out.println("!!!!!!!!!!!!!DECAYS ARE NULL!!!!!!!!!!!!!!!!!!!");
         }
     }
 
+    public void updateWithNoBeamSpotPars(String nbspids) {
+        noBeamConst = new ArrayList<>();
+        
+        if(nbspids!=null) {
+            String[] chain = nbspids.split(":");
+            for(int i =0; i< chain.length; i++) {
+                System.out.println("use CVT no Beam Spot constraint for PID "+chain[i]);
+                noBeamConst.add(Integer.parseInt(chain[i]));
+            }
+        } 
+    }
+    
     public int getRun() {
         return Run;
     }
@@ -87,11 +104,18 @@ public class Analysis extends ReconstructionEngine {
             System.err.println("RUN CONDITIONS NOT READ!");
             return false;
         }
+        
         reader = new Reader();
         writer = new Writer();
         
         int newRun = event.getBank("RUN::config").getInt("run", 0); 
-        if (Run != newRun)  this.setRun(newRun); 
+        if (Run != newRun)  {
+            this.setRun(newRun);
+            if (event.getBank("RUN::config").getInt("run",0) >= 100) {
+                rcdb = conman.getRcdbConstants(event.getBank("RUN::config").getInt("run",0));
+                beamE=rcdb.getDouble("beam_energy");
+            }
+        } 
         //System.out.println("EVENT "+event.getBank("RUN::config").getInt("event", 0));
         this.Run = this.getRun();
         
@@ -111,14 +135,8 @@ public class Analysis extends ReconstructionEngine {
         int ev  = recRun.getInt("event",0);
         int run = recRun.getInt("run",0);
         Swim swim = new Swim();
-        //reader.readAnalBanks(event);
-        reader.readBanks(event);
-        //List<Particle> parts1 = reader.getPartsFromRec(event);
-        //reader.updateDausList(parts1);
-        //System.out.println("e detected "+reader.iseDetected);
-        //DataBank runBank = ep.FillHeader(recRun);
-        //if(!reader.iseDetected)
-        //    return false;
+        reader.readBanks(event, pass, noBeamConst);
+       
         List<Particle> allparts = new ArrayList<>();
         
         reader.getDaus().forEach((key,value) -> allparts.add(value));
@@ -138,11 +156,15 @@ public class Analysis extends ReconstructionEngine {
                 }
             }
         } 
-        
-        DataBank bank = Writer.fillBank(event, parts, "ANAL::Particle", pass);
+        DataBank bank =null;
+        if(parts.isEmpty()) {
+            if(event.hasBank("ANAL::Particle")) event.removeBank("ANAL::Particle");
+        } else {
+            bank = Writer.fillBank(event, parts, "ANAL::Particle", pass);
+        }
         if(bank!=null) {
             event.appendBanks(bank);
-            bank.show();
+            //bank.show();
             //System.out.println("================================================");
             //System.out.println(event.getBank("ANALREC::Particle").getInt("event", 0));
             //System.out.println("================================================");
@@ -178,9 +200,11 @@ public class Analysis extends ReconstructionEngine {
         if (this.getEngineConfigString("pass")!=null) {
             pass=Integer.parseInt(this.getEngineConfigString("pass"));
         }
+        String nbs ="nobeamspot";
+        if (this.getEngineConfigString(nbs)!=null) 
+            this.updateWithNoBeamSpotPars(this.getEngineConfigString(nbs));
         Constants.Load();
     }
-    
     
     
     public void printConfiguration() {            

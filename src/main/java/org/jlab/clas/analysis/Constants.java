@@ -13,7 +13,7 @@ import org.jlab.clas.pdg.PDGParticle;
  */
 public class Constants {
 
-    public static double CHI2PIDCUT=15;
+    public static double CHI2PIDCUT=150000.0;
     
     
  // private constructor for a singleton

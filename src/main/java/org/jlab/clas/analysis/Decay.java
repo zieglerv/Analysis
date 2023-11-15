@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jlab.clas.analysis.event.Reader;
 import org.jlab.clas.swimtools.Swim;
 import org.jlab.geom.prim.Line3D;
 import org.jlab.geom.prim.Point3D;
@@ -34,8 +35,9 @@ public class Decay extends Particle {
     private Map<Integer, List<Particle>> listsByPID = new HashMap<>();
     private static DataBank vertBank;
     
-    public Decay(int parPID, int dau1PID, int dau2PID, int dau3PID, double loMassCut, double hiMassCut,
-            List<Particle> daughters, Swim swim, int pass) { 
+    public Decay(int parPID, int dau1PID, int dau2PID, int dau3PID, double loMassCut, double hiMassCut, 
+            double loMMassCut, double hiMMassCut, double eBeam, Reader.Target target,  
+            List<Particle> daughters, Particle el, Swim swim, int pass) { 
         _parPID = parPID;
         _dau1PID = dau1PID;
         _dau2PID = dau2PID;
@@ -60,7 +62,7 @@ public class Decay extends Particle {
                 _particles = new ArrayList<>();
                 if(list3.isEmpty()) {
                     for(Particle part01 : list1) {
-                        for(Particle part02 : list2) {
+                        for(Particle part02 : list2) { 
                             Particle part = new Particle();
                             boolean overlaps = this.overlaps(part01, part02);
                             if(overlaps) { 
@@ -68,78 +70,103 @@ public class Decay extends Particle {
                             }
                             //make a clone and assign vtx row id
                             Particle part1 = new Particle(part01);
-                            Particle part2 = new Particle(part02);
+                            Particle part2 = new Particle(part02); 
                             if(part1.getCharge()!=0 && part2.getCharge()!=0 ) { 
                                 if(pass==1)
-                                    if(this.checkVertex(part1,part2)==false) {
+                                    if(this.checkVertex(part1,part2)==false) { 
+                                       continue;
+                                    } 
+                                if(pass>1 )
+                                    if(this.makeVertex(part1,part2)==false) {
                                         continue;
                                     }
-                                if(pass>1)
-                                    if(this.checkSequentialVertex(part1,part2)==false) {
-                                        continue;
-                                    }
-                                if(part.combine(part1, part2, parPID, loMassCut, hiMassCut)==false) continue;
+                                if(part.combine(part1, part2, parPID, loMassCut, hiMassCut)==false) 
+                                    continue;
                             }
                             
-                                
                             if(part1.getCharge()!=0 && part2.getCharge()==0) { 
-                                double[][] p1 = part1.SwimTo(part2, swim);
-                                double vx1 = p1[0][0];
-                                double vy1 = p1[0][1];
-                                double vz1 = p1[0][2];
-                                double px1 = p1[0][3];
-                                double py1 = p1[0][4];
-                                double pz1 = p1[0][5];
-                                double vx2 = p1[1][0];
-                                double vy2 = p1[1][1];
-                                double vz2 = p1[1][2];
-                                double px2 = p1[1][3];
-                                double py2 = p1[1][4];
-                                double pz2 = p1[1][5];
-                                part1.setVx(vx1);
-                                part1.setVy(vy1);
-                                part1.setVz(vz1);
-                                part1.setPx(px1);
-                                part1.setPy(py1);
-                                part1.setPz(pz1);
-                                part2.setVx(vx2);
-                                part2.setVy(vy2);
-                                part2.setVz(vz2);
-                                part2.setPx(px2);
-                                part2.setPy(py2);
-                                part2.setPz(pz2);
-                                if(part.combine(part1, part2, parPID, loMassCut, hiMassCut)==false) continue;
+                                
+                                double[] p1 = part1.SwimTo(part2, swim);
+                                double v1x = p1[0];
+                                double v1y = p1[1];
+                                double v1z = p1[2];
+                                double p1x = p1[3];
+                                double p1y = p1[4];
+                                double p1z = p1[5];
+                                int q1 = part1.getCharge();
+                                double ue1 = part1.getuE();
+                                double e1 = part1.getE();
+                                double emc1 = part1.getMassConstrE();
+                                double up1x = part1.getUpx();
+                                double up1y = part1.getUpy();
+                                double up1z = part1.getUpz();
+                                int q2 = part2.getCharge();
+                                double ue2 = part2.getuE();
+                                double e2 = part2.getE();
+                                double emc2 = part2.getMassConstrE();
+                                double up2x = part2.getUpx();
+                                double up2y = part2.getUpy();
+                                double up2z = part2.getUpz();
+                                
+                                double v2x = part2.getVx();
+                                double v2y = part2.getVy();
+                                double v2z = part2.getVz();
+                                double p2x = part2.getPx();
+                                double p2y = part2.getPy();
+                                double p2z = part2.getPz();
+                                
+                                if(part.combine(q1, ue1, e1, emc1, v1x, v1y, v1z, p1x, p1y, p1z, up1x, up1y, up1z, 
+                                        q2, ue2, e2, emc2, v2x, v2y, v2z, p2x, p2y, p2z, up2x, up2y, up2z, parPID, loMassCut, hiMassCut)==false) continue;
+                                part1.setVx(v1x);
+                                part1.setVy(v1y);
+                                part1.setVz(v1z);
+                                part1.setPx(p1x);
+                                part1.setPy(p1y);
+                                part1.setPz(p1z);
+                                part.getDaughters().add(part1);
+                                part.getDaughters().add(part2);
                                 
                             } else if(part2.getCharge()!=0 && part1.getCharge()==0) { 
+                                double[] p2 = part2.SwimTo(part1, swim);
+                                double v2x = p2[0];
+                                double v2y = p2[1];
+                                double v2z = p2[2];
+                                double p2x = p2[3];
+                                double p2y = p2[4];
+                                double p2z = p2[5];
+                                int q1 = part1.getCharge();
+                                double ue1 = part1.getuE();
+                                double e1 = part1.getE();
+                                double emc1 = part1.getMassConstrE();
+                                double up1x = part1.getUpx();
+                                double up1y = part1.getUpy();
+                                double up1z = part1.getUpz();
+                                int q2 = part2.getCharge();
+                                double ue2 = part2.getuE();
+                                double e2 = part2.getE();
+                                double emc2 = part2.getMassConstrE();
+                                double up2x = part2.getUpx();
+                                double up2y = part2.getUpy();
+                                double up2z = part2.getUpz();
                                 
-                                double[][] p2 = part2.SwimTo(part1, swim);
-                                double vx2 = p2[0][0];
-                                double vy2 = p2[0][1];
-                                double vz2 = p2[0][2];
-                                double px2 = p2[0][3];
-                                double py2 = p2[0][4];
-                                double pz2 = p2[0][5];
-                                double vx1 = p2[1][0];
-                                double vy1 = p2[1][1];
-                                double vz1 = p2[1][2];
-                                double px1 = p2[1][3];
-                                double py1 = p2[1][4];
-                                double pz1 = p2[1][5];
-                                part2.setVx(vx2);
-                                part2.setVy(vy2);
-                                part2.setVz(vz2);
-                                part2.setPx(px2);
-                                part2.setPy(py2);
-                                part2.setPz(pz2);
-                                part1.setVx(vx1);
-                                part1.setVy(vy1);
-                                part1.setVz(vz1);
-                                part1.setPx(px1);
-                                part1.setPy(py1);
-                                part1.setPz(pz1);
-                               if(part.combine(part1, part2, parPID, loMassCut, hiMassCut)==false) continue;
+                                double v1x = part1.getVx();
+                                double v1y = part1.getVy();
+                                double v1z = part1.getVz();
+                                double p1x = part1.getPx();
+                                double p1y = part1.getPy();
+                                double p1z = part1.getPz();
+                                
+                                if(part.combine(q1, ue1, e1, emc1, v1x, v1y, v1z, p1x, p1y, p1z, up1x, up1y, up1z, 
+                                        q2, ue2, e2, emc2, v2x, v2y, v2z, p2x, p2y, p2z, up2x, up2y, up2z, parPID, loMassCut, hiMassCut)==false) continue;
+                                part2.setVx(v2x);
+                                part2.setVy(v2y);
+                                part2.setVz(v2z);
+                                part2.setPx(p2x);
+                                part2.setPy(p2y);
+                                part2.setPz(p2z);
+                                part.getDaughters().add(part1);
+                                part.getDaughters().add(part2);
                             } else if(part2.getCharge()==0 && part1.getCharge()==0) { 
-                                //System.out.println("PID1 "+part1.getPid()+" PID2 "+part2.getPid());
                                 Point3D P1X1 = new Point3D(part1.getVx()-100*part1.getPx(), 
                                         part1.getVy()-100*part1.getPy(), 
                                         part1.getVz()-100*part1.getPz());
@@ -155,24 +182,46 @@ public class Decay extends Particle {
                                 Line3D par1Extrap =new Line3D(P1X1,P1X2);
                                 Line3D par2Extrap =new Line3D(P2X1,P2X2);
                                 Line3D parExtrap = par1Extrap.distance(par2Extrap);
-                                double vx1 = parExtrap.origin().x();
-                                double vy1 = parExtrap.origin().y();
-                                double vz1 = parExtrap.origin().z();
-                                double vx2 = parExtrap.end().x();
-                                double vy2 = parExtrap.end().y();
-                                double vz2 = parExtrap.end().z();
-                                part1.setVx(vx1);
-                                part1.setVy(vy1);
-                                part1.setVz(vz1);
-                                part2.setVx(vx2);
-                                part2.setVy(vy2);
-                                part2.setVz(vz2);
-                                if(part.combine(part1, part2, parPID, loMassCut, hiMassCut)==false) continue;
+                                double v1x = parExtrap.origin().x();
+                                double v1y = parExtrap.origin().y();
+                                double v1z = parExtrap.origin().z();
+                                double v2x = parExtrap.end().x();
+                                double v2y = parExtrap.end().y();
+                                double v2z = parExtrap.end().z();
+                                
+                                int q1 = part1.getCharge();
+                                double ue1 = part1.getuE();
+                                double e1 = part1.getE();
+                                double emc1 = part1.getMassConstrE();
+                                double p1x = part1.getPx();
+                                double p1y = part1.getPy();
+                                double p1z = part1.getPz();
+                                double up1x = part1.getUpx();
+                                double up1y = part1.getUpy();
+                                double up1z = part1.getUpz();
+                                int q2 = part2.getCharge();
+                                double ue2 = part2.getuE();
+                                double e2 = part2.getE();
+                                double emc2 = part2.getMassConstrE();
+                                double p2x = part2.getPx();
+                                double p2y = part2.getPy();
+                                double p2z = part2.getPz();
+                                double up2x = part2.getUpx();
+                                double up2y = part2.getUpy();
+                                double up2z = part2.getUpz();
+                               
+                                if(part.combine(q1, ue1, e1, emc1, v1x, v1y, v1z, p1x, p1y, p1z, up1x, up1y, up1z, 
+                                                q2, ue2, e2, emc2, v2x, v2y, v2z, p2x, p2y, p2z, up2x, up2y, up2z, 
+                                                parPID, loMassCut, hiMassCut)==false) continue;
+                                part.getDaughters().add(part1);
+                                part.getDaughters().add(part2);
+                               
                             }
                             part1.isUsed = true;
                             part2.isUsed = true;
                             
-                            _particles.add(part);
+                            if(part.getMissingMass(el, eBeam, target)>loMMassCut && part.getMissingMass(el, eBeam, target)<hiMMassCut)
+                                _particles.add(part);
                         
                         }
                     }
@@ -234,7 +283,7 @@ public class Decay extends Particle {
         Decay.vertBank = vertBank;
     }
     private DoubleSwim _ds = new DoubleSwim();
-    private boolean checkSequentialVertex(Particle p1, Particle p2) {
+    private boolean makeVertex(Particle p1, Particle p2) { 
         boolean pass = false;
         double vx1,vy1,vz1,vx2,vy2,vz2;
         double px1,py1,pz1,px2,py2,pz2; 
@@ -297,14 +346,14 @@ public class Decay extends Particle {
         return pass;
      }
     
-    private boolean checkVertex(Particle p1, Particle p2) {
+    private boolean checkVertDocaBank(Particle p1, Particle p2) {
         boolean pass = false;
         if(getVertBank()==null) return pass;
         
         if(getVertBank()!=null) { 
             int nrows2 = getVertBank().rows();
             for(int loop2 = 0; loop2 < nrows2; loop2++){
-                //double r = 999;
+                double r = 999;
                 //double vx =999;
                 //double vy =999;
                 //double vz =999;
@@ -326,7 +375,7 @@ public class Decay extends Particle {
                     p1.vIndex=loop2;
                     p2.vIndex=loop2;
                     
-                    //r =  (double) getVertBank().getFloat("r", loop2);
+                    r =  (double) getVertBank().getFloat("r", loop2);
                     //vx = (double) getVertBank().getFloat("x", loop2);
                     //vy = (double) getVertBank().getFloat("y", loop2);
                     //vz = (double) getVertBank().getFloat("z", loop2);
@@ -389,7 +438,7 @@ public class Decay extends Particle {
                     p2.setPx(px2);
                     p2.setPy(py2);
                     p2.setPz(pz2);
-                    
+                    //this.resetE(p1,p2);
                     pass=true; 
                     return pass;
                 }
@@ -398,6 +447,15 @@ public class Decay extends Particle {
             
         }
        
+        return pass;
+    }    
+    
+    
+    private boolean checkVertex(Particle p1, Particle p2) {
+        boolean pass = this.checkVertDocaBank(p1, p2);
+        if(getVertBank()==null) 
+            pass = this.makeVertex(p1, p2);
+        
         return pass;
     }
 
@@ -438,5 +496,27 @@ public class Decay extends Particle {
         return overlaps;
     }
 
+    private void resetE(Particle p1, Particle p2) {
+        double beta1 = p1.getBeta();
+        double p_1 = Math.sqrt(p1.getPx()*p1.getPx()+p1.getPy()*p1.getPy()+p1.getPz()*p1.getPz());
+        double m_1 = p1.getMass();
+        p1.setUncormass(Math.sqrt((p_1/beta1)*(p_1/beta1)-p_1*p_1));
+        double mu_1 = p1.getUncormass();
+        double beta2 = p2.getBeta();
+        double p_2 = Math.sqrt(p2.getPx()*p2.getPx()+p2.getPy()*p2.getPy()+p2.getPz()*p2.getPz());
+        p2.setUncormass(Math.sqrt((p_2/beta2)*(p_2/beta2)-p_2*p_2));
+        double m_2 = p2.getMass();
+        double mu_2 = p2.getUncormass();
+        double E1 = Math.sqrt(p_1*p_1+m_1*m_1);
+        double E2 = Math.sqrt(p_2*p_2+m_2*m_2);
+        double uE1 = Math.sqrt(p_1*p_1+mu_1*mu_1);
+        double uE2 = Math.sqrt(p_2*p_2+mu_2*mu_2);
+        p1.setE(E1);
+        p2.setE(E2);
+        p1.setMassConstrE(E1);
+        p2.setMassConstrE(E2);
+        p1.setuE(uE1);
+        p2.setuE(uE2); 
+    }
     
 }

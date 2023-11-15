@@ -15,10 +15,9 @@ import org.jlab.io.base.DataEvent;
  */
 public class Writer {
     
-    public static DataBank fillBank(DataEvent event, List<Particle> partlist, 
+    public static DataBank fillBank(DataEvent event, List<Particle> partlist, Particle el,
             String bankName, int pass) {
         if (partlist == null || partlist.isEmpty()) return null;
-        
         int bankSize = 0;
         for(Particle p : partlist) {
             bankSize++;
@@ -38,11 +37,15 @@ public class Writer {
         int i = -1;
         for (int ii = 0; ii < partlist.size(); ii++) {
             i++;
-            partBank.setShort("idx",i, (short) (pass*100+ii));
+            if(partlist.get(ii).keepSameIdx) {
+                partBank.setShort("idx",i, (short) partlist.get(ii).getIdx());
+            } else {
+                partBank.setShort("idx",i, (short) (pass*100+ii));
+            }
             Particle parent = partlist.get(ii);
-            parent.setOvx(Reader.v0x);
-            parent.setOvy(Reader.v0y);
-            parent.setOvz(Reader.v0z);
+            parent.setOvx(el.getOvx());
+            parent.setOvy(el.getOvy());
+            parent.setOvz(el.getOvz());
             fillBankValues(partBank, i, parent);
             if(!parent.getDaughters().isEmpty()) {
                 String ds;
@@ -128,6 +131,7 @@ public class Writer {
         partBank.setFloat("r",i, (float) p.getR());
         partBank.setByte("charge", i, (byte) p.getCharge());
         partBank.setFloat("mass",i, (float) p.getMass());
+        partBank.setFloat("umass",i, (float) p.getUncormass());
         partBank.setByte("ndau",i, (byte) p.getDaughters().size());
         partBank.setByte("det", i, (byte) p.getDet());
     }
